@@ -1,0 +1,26 @@
+name = "supplyflow-api"
+main = "src/index.ts"
+compatibility_date = "2025-05-26"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+
+[[kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = ""  # set in production
+
+[[queues.producers]]
+binding = "TASK_QUEUE"
+queue = "supplyflow-tasks"
+
+[[queues.consumers]]
+queue = "supplyflow-tasks"
+max_batch_size = 10
+max_batch_timeout = 5
+
+[triggers]
+crons = []  # cron triggers are in apps/jobs
+
+[vars]
+ENVIRONMENT = "development"

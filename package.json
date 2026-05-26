@@ -1,0 +1,25 @@
+{
+  "name": "supplyflow",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Real-Time Supply for Real-World Kitchens",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "clean": "turbo clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.4",
+    "typescript": "^5.8.3",
+    "@types/node": "^22.15.21",
+    "prettier": "^3.5.3"
+  },
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@10.33.0"
+}

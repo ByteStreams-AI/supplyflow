@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "SupplyFlow",
+    "slug": "supplyflow",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "scheme": "supplyflow",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "ai.bytestreams.supplyflow"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#ffffff"
+      },
+      "package": "ai.bytestreams.supplyflow"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-camera",
+        { "cameraPermission": "Allow SupplyFlow to access your camera for receiving and picking." }
+      ],
+      [
+        "expo-barcode-scanner",
+        { "cameraPermission": "Allow SupplyFlow to scan barcodes." }
+      ]
+    ],
+    "updates": {
+      "url": "https://u.expo.dev/supplyflow"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    }
+  }
+}

@@ -1,0 +1,10 @@
+export { authRoutes } from './auth';
+export { catalogRoutes } from './catalog';
+export { procurementRoutes } from './procurement';
+export { inventoryRoutes } from './inventory';
+export { warehousingRoutes } from './warehousing';
+export { transfersRoutes } from './transfers';
+export { salesRoutes } from './sales';
+export { costingRoutes } from './costing';
+export { aiRoutes } from './ai';
+export { billingRoutes } from './billing';
