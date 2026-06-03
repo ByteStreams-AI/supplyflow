@@ -1,0 +1,1 @@
+{"root":["./src/client.ts","./src/index.ts","./src/rls.ts","./src/schema/catalog.ts","./src/schema/index.ts","./src/schema/operations.ts","./src/schema/procurement.ts","./src/schema/tenancy.ts"],"version":"5.9.3"}

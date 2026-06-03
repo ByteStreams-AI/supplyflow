@@ -7,6 +7,9 @@ export async function recalculatePlateCost(
   _menuItemId: string,
   _tenantId: string,
 ): Promise<number> {
+  void _db;
+  void _menuItemId;
+  void _tenantId;
   // TODO: load exploded BOM, join avg_cost from stock_level, sum
   return 0;
 }

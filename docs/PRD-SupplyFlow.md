@@ -19,10 +19,11 @@
 ### 1.1 Summary
 
 SupplyFlow is a **multi-tenant SaaS** restaurant supply-chain platform. It gives independent
-restaurants and small chains real-time control over procurement, inventory, warehousing,
-logistics, and food cost — driven by actual sales rather than guesswork. Every menu item is
-backed by a **Bill of Materials (BOM)**, so when a sale happens, stock is depleted to the
-ingredient level automatically and true plate cost is always known.
+multi-location operators and small regional chains (primarily **3–30 locations**) real-time
+control over procurement, inventory, warehousing, logistics, and food cost — driven by actual
+sales rather than guesswork. Every menu item is backed by a **Bill of Materials (BOM)**, so
+when a sale happens, stock is depleted to the ingredient level automatically and true plate cost
+is always known.
 
 SupplyFlow is **AI-forward**: predictive sourcing, demand forecasting, price-trend modeling,
 and shortage detection are headline capabilities from launch, not a later add-on.
@@ -54,8 +55,8 @@ Derived directly from the source notes:
 ### 1.4 Non-Goals (v1)
 
 - Not a full accounting/ERP system (integrate, don't replace).
-- Not a third-party POS integration in v1 — sales come from **DialTone** (see §3.7). Generic
-  POS connectors are a planned future channel.
+- Not broad POS coverage in v1 — implement connectors in this order: **DialTone first, then
+  Toast, then Square**; keep ingestion channel-agnostic and defer broader connector expansion.
 - Not a payroll, scheduling, or HR tool.
 - Not a consumer-facing ordering app.
 
@@ -65,11 +66,13 @@ Derived directly from the source notes:
 
 ### 2.1 Primary Customers
 
-- **Independent restaurants** (1 location) wanting real food-cost control.
-- **Small multi-location groups / regional chains** (2–15 locations) needing consolidated
-  purchasing, inter-location transfers, and a central commissary view.
-- Operators already using — or adopting — **DialTone** for voice-AI phone ordering, who want
-  their order stream to drive inventory automatically.
+- **Primary ICP:** independent multi-location operators and small regional chains
+  (**3–30 locations**) needing consolidated purchasing, inter-location transfers, and a central
+  commissary view.
+- **Secondary ICP:** single-location operators with high COGS volatility who can grow into
+  multi-site operations.
+- Operators using **DialTone** now, plus operators on **Toast** and **Square** as phased
+  connector rollout reaches those channels.
 
 ### 2.2 User Roles (Personas)
 
@@ -212,7 +215,7 @@ sub-recipes, and packaging.
 
 - **Real-time stock levels** per item per location, across all sales channels.
 - **Sales-driven depletion** — completed sales explode through the BOM and decrement raw
-  stock (see §3.7 for the DialTone feed).
+  stock (see §3.7 for the primary POS channel feed).
 - **80/20 (ABC) analysis** — classify items by contribution to revenue/profit; surface the
   ~20% of items driving ~80% of value so attention and capital focus there.
 - **Inventory balance tools:**
@@ -300,44 +303,44 @@ sub-recipes, and packaging.
 - v1 logistics is operational tracking, not route optimization; third-party carrier/route APIs
   are a future phase (§11).
 
-### 3.7 Module G — DialTone Integration & Sales-Driven Depletion
+### 3.7 Module G — POS Integration & Sales-Driven Depletion
 
-**This is the v1 sales channel.** Instead of integrating third-party POS systems, SupplyFlow
-consumes completed orders from **DialTone** (`dialtone.menu`) — the ByteStreams voice-AI phone
-ordering agent for restaurants.
+**This is the core wedge loop in v1:** sale → depletion → reorder signal. SupplyFlow implements
+connectors in this order: **DialTone first, then Toast, then Square**, while keeping ingestion
+channel-agnostic so additional channels can be added later without reworking depletion.
 
 **Capabilities**
 
-- **Order ingestion** — receive each completed/paid DialTone order as an event.
-- **Menu mapping** — a mapping layer links each DialTone menu item to a SupplyFlow menu item
+- **Order ingestion** — receive each completed/paid order from the chosen primary channel.
+- **Menu mapping** — a mapping layer links each external channel item to a SupplyFlow menu item
   (and therefore its BOM). Unmapped items are quarantined for the user to resolve.
 - **Depletion** — each ingested order line is BOM-exploded (§3.2) and posted as
   sale-depletion transactions against the originating location's stock.
-- **Reconciliation** — a sales/depletion view ties DialTone revenue to ingredient consumption
-  and theoretical cost.
+- **Reconciliation** — a sales/depletion view ties channel revenue to ingredient consumption and
+  theoretical cost.
+- **Reorder signal output** — low-stock outcomes from depletion raise alerts and draft PO inputs
+  for procurement flow continuity.
 
 **Acceptance Criteria**
 
-- A completed DialTone order results in correct raw-ingredient depletion at the right location
+- A completed channel order results in correct raw-ingredient depletion at the right location
   within seconds, with idempotency (a replayed order is not double-counted).
-- A DialTone menu item with no SupplyFlow mapping does **not** silently drop — it is queued as
-  an "unmapped item" exception with a clear resolution prompt.
-- The depletion for an order is traceable back to the source DialTone order ID.
+- An external channel item with no SupplyFlow mapping does **not** silently drop — it is queued
+  as an "unmapped item" exception with a clear resolution prompt.
+- The depletion for an order is traceable back to the source `source_system + source_order_id`.
+- Depletion-driven low-stock outcomes can generate reorder suggestions without manual recalc.
 
 **Technical Considerations**
 
-- DialTone runs on **Cloudflare Workers + Supabase + Stripe**. The DialTone
-  **order-completed webhook is in active development**; v1 integration targets it as the
-  primary path. A scheduled cross-project pull is retained as a contingency if the webhook
-  is not ready by Phase 3.
-- SupplyFlow runs its **own separate Supabase project** — it does **not** share DialTone's
-  database. Integration is via the webhook/API only. This keeps SupplyFlow's schema
-  independent and free to add generic POS channels later without coupling to DialTone.
+- Connector implementation order is fixed for this window: **DialTone → Toast → Square**;
+  depth and reliability at each step take priority over adding breadth.
+- SupplyFlow runs its **own separate Supabase project**; all channel integrations (POS or
+  DialTone) are webhook/API based, with no shared schema coupling.
 - **Idempotency:** store `source_system` + `source_order_id`; ingestion is upsert-keyed on it.
 - A mapping table `channel_item_map (tenant, channel, external_item_id → menu_item_id)`
-  decouples DialTone's menu identifiers from SupplyFlow's catalog.
-- Design the ingestion endpoint channel-agnostic so generic POS connectors (Toast, Square,
-  Clover) can be added later (§11) without reworking depletion.
+  decouples channel-specific menu identifiers from SupplyFlow's catalog.
+- Design the ingestion endpoint channel-agnostic so additional connectors can be added later
+  (§11) without reworking depletion.
 
 ### 3.8 Module H — Cost Controls (Objective O6)
 
@@ -362,7 +365,7 @@ ordering agent for restaurants.
 **Technical Considerations**
 
 - Plate cost reuses the BOM-explosion routine (§3.2) with current WAC per raw item.
-- Sales-mix weighting uses ingested DialTone order volume (§3.7).
+- Sales-mix weighting uses ingested channel order volume (§3.7).
 - Cost snapshots are immutable rows keyed by date + BOM version + item-cost vector.
 
 ### 3.9 Module I — Predictive Intelligence / AI (Objective O5)
@@ -372,7 +375,8 @@ SupplyFlow is **AI-forward in v1.** Four AI capabilities ship at launch:
 **1. Demand Forecasting**
 
 - Forecast menu-item and ingredient demand per location.
-- Inputs: historical DialTone sales, day-of-week/seasonality, holidays, local events, weather.
+- Inputs: historical channel sales (POS and DialTone where present), day-of-week/seasonality,
+  holidays, local events, weather.
 - Outputs: suggested par levels, reorder points, and order quantities feeding Procurement (§3.3).
 
 **2. Price-Trend Prediction**
@@ -452,7 +456,7 @@ infrastructure, billing, and operational knowledge.
 | **Email**             | **Resend** (`send.bytestreams.ai`)                                                     | Same sending domain/infra as DialTone; PO emails, alerts.                                                                                                                     |
 | **Push / SMS**        | **Expo Push** (mobile alerts); Twilio optional for SMS                                 | Low-stock, delivery, and shortage alerts.                                                                                                                                     |
 | **Object storage**    | **Supabase Storage** or **Cloudflare R2**                                              | Invoice/delivery photos, item images, PO PDFs.                                                                                                                                |
-| **Jobs / scheduling** | **Cloudflare Cron Triggers + Queues**                                                  | ABC analysis, forecast runs, reorder checks, DialTone pull fallback.                                                                                                          |
+| **Jobs / scheduling** | **Cloudflare Cron Triggers + Queues**                                                  | ABC analysis, forecast runs, reorder checks, and channel pull fallback where needed.                                                                                           |
 | **Observability**     | Cloudflare Workers logs/traces; error tracking (Sentry)                                | Mirror DialTone observability config.                                                                                                                                         |
 
 > Documentation references: [Supabase RLS](https://supabase.com/docs/guides/database/postgres/row-level-security),
@@ -536,12 +540,12 @@ Every domain table carries a non-null `tenant_id` (RLS scope). Types are concept
 
 ### 6.5 Sales, Cost & AI
 
-- **sales_order** — `id`, `tenant_id`, `location_id`, `source_system (enum: dialtone|...)`,
+- **sales_order** — `id`, `tenant_id`, `location_id`, `source_system (enum: dialtone|toast|square|...)`,
   `source_order_id (string)`, `ordered_at (timestamptz)`, `gross_revenue (numeric)`,
   `status (enum: ingested|depleted|exception)`. *(Unique on `source_system` + `source_order_id`.)*
 - **sales_order_line** — `id`, `sales_order_id → sales_order`, `menu_item_id → menu_item`,
   `qty (numeric)`, `line_revenue (numeric)`.
-- **channel_item_map** — `id`, `tenant_id`, `channel (enum: dialtone|...)`,
+- **channel_item_map** — `id`, `tenant_id`, `channel (enum: dialtone|toast|square|...)`,
   `external_item_id (string)`, `menu_item_id → menu_item`.
 - **cost_snapshot** — `id`, `tenant_id`, `menu_item_id`, `recipe_version_id`,
   `plate_cost (numeric)`, `food_cost_pct (numeric)`, `snapshot_date (date)`.
@@ -602,7 +606,7 @@ menu_item 1─* cost_snapshot ; menu_item/item 1─* forecast, abc_classificatio
   as platform secrets (Cloudflare/Worker secrets), never in git — mirror DialTone's practice.
 - **Audit trail:** immutable `audit_log` for PO approvals, price overrides, and inventory
   adjustments.
-- **Webhook security:** the DialTone ingestion endpoint verifies a signed secret/HMAC and is
+- **Webhook security:** channel ingestion endpoints verify signed secrets/HMAC and are
   idempotent to prevent replay/double-depletion.
 - **Rate limiting** on public endpoints (ingestion, auth) — reuse DialTone's KV-backed pattern.
 - **Data protection:** TLS in transit; encryption at rest (Supabase default); least-privilege
@@ -638,12 +642,12 @@ A phased plan; each phase is releasable. Module letters refer to §3.
 - Module E: storage areas, mobile receiving against PO, picking, expiry alerts.
 - **Exit:** a full procure-to-receive cycle works end to end.
 
-### Phase 3 — DialTone Integration & Cost Controls (Sprint 9–10)
+### Phase 3 — POS Integration & Cost Controls (Sprint 9–10)
 
 - Module G: order ingestion, menu mapping, BOM-driven depletion, idempotency, reconciliation.
 - Module H: live plate cost, food-cost %, cost history, margin dashboard, snapshots.
 - Module D (ABC): 80/20 classification.
-- **Exit:** DialTone sales deplete inventory automatically; true food cost is live.
+- **Exit:** first integrated sales channel depletes inventory automatically; true food cost is live.
 
 ### Phase 4 — Logistics & Predictive AI (Sprint 11–14)
 
@@ -655,7 +659,7 @@ A phased plan; each phase is releasable. Module letters refer to §3.
 ### Phase 5 — Hardening & Launch (Sprint 15–16)
 
 - Offline sync hardening, performance, security review, accessibility, observability,
-  onboarding polish, pilot with DialTone restaurants.
+  onboarding polish, pilot with 3–30 location operators (including DialTone restaurants where applicable).
 
 ---
 
@@ -665,7 +669,7 @@ A phased plan; each phase is releasable. Module letters refer to §3.
 | ---------------------------------------------------------------------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | **BOM data entry burden** — full recipe costing fails if BOMs aren't accurate.     | Adoption blocker.       | Onboarding wizard; Claude-assisted recipe/invoice import; category templates; start with A-class items only.           |
 | **Unit-of-measure conversions** — cases↔lbs↔oz errors corrupt costs and stock.     | High.                   | Strict UoM model with explicit conversion factors; validation; conversions surfaced in UI.                             |
-| **DialTone webhook timing** — the order-completed webhook is still in development. | Phase 3 schedule risk.  | Channel-agnostic ingestion; primary webhook path with a scheduled cross-project pull as contingency; idempotency keys. |
+| **Connector rollout sequencing risk** — phased delivery can slip across channels. | Phase 3 schedule risk.  | Execute fixed order (**DialTone → Toast → Square**), with explicit go-live gates per connector; keep channel-agnostic ingestion and enforce idempotency keys. |
 | **Forecast cold-start** — no per-tenant history at launch.                         | AI underdelivers early. | Category-level priors and classical baselines until tenant history accrues; show confidence.                           |
 | **Inventory drift** — theoretical vs. actual diverges over time.                   | Trust erosion.          | Event-sourced ledger; cycle counts; variance reporting; never hide shrinkage.                                          |
 | **Offline mobile in walk-ins/storerooms** — poor connectivity.                     | Data loss/UX.           | Offline-capable counts/receiving with local queue and conflict-aware sync.                                             |
@@ -677,8 +681,8 @@ A phased plan; each phase is releasable. Module letters refer to §3.
 
 ## 11. Future Expansion Possibilities
 
-- **Generic POS connectors** — Toast, Square, Clover, Lightspeed via the channel-agnostic
-  ingestion layer, beyond DialTone.
+- **Additional POS connectors** — after the DialTone → Toast → Square sequence is stable,
+  add Clover/Lightspeed and other adapters via the same channel-agnostic ingestion layer.
 - **Vendor/supplier marketplace** — let vendors publish catalogs and bid on shopping lists.
 - **Accounting integrations** — QuickBooks / Xero sync for invoices and COGS.
 - **Route optimization & carrier APIs** for tenants running their own distribution.
@@ -694,13 +698,12 @@ A phased plan; each phase is releasable. Module letters refer to §3.
 
 ## 12. Open Questions & Assumptions
 
-**Confirmed decisions (2026-05-21 review)**
+**Confirmed decisions (updated 2026-06-03 market-alignment review)**
 
-- **Sales channel:** DialTone is the v1 sales channel; its order-completed webhook is in
-  active development. Generic POS integrations (Toast, Square, etc.) are a planned future
-  channel — the ingestion layer is built channel-agnostic for this.
-- **Database:** SupplyFlow runs its **own separate Supabase project**, not shared with
-  DialTone; integration is via webhook/API only.
+- **Sales channel strategy:** v1 connector implementation order is **DialTone → Toast → Square**.
+  The ingestion layer remains channel-agnostic.
+- **Database:** SupplyFlow runs its **own separate Supabase project**; integrations are
+  webhook/API based only.
 - **Pricing:** SupplyFlow will be sold in **multiple pricing tiers**; tier definitions and
   per-tier location/user limits are not yet decided.
 - **Commissary/warehouse:** central commissary/warehouse operations **are in scope** for the
@@ -716,9 +719,8 @@ A phased plan; each phase is releasable. Module letters refer to §3.
 1. Pricing tiers — how many, and what are the per-tier location/user limits? (Plan
    entitlement logic in Module A depends on this.)
 2. Which external price/commodity data feeds are licensable for the price-trend models?
-3. Target launch customer count and the pilot cohort (DialTone pilot restaurants)?
-4. Expected readiness date for the DialTone webhook — does it gate SupplyFlow's Phase 3, or
-   should the pull-fallback be built proactively?
+3. What are the promotion gates from DialTone to Toast, and from Toast to Square (readiness, reliability, and support criteria)?
+4. Target launch customer count and pilot cohort within the 3–30 location segment?
 
 ---
 

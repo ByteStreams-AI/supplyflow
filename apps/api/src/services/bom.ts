@@ -14,10 +14,10 @@ export async function postSaleDepletion(
     lines: Array<{ menuItemId: string; bom: ComponentEdge[]; qtySold: number }>;
   },
 ): Promise<void> {
+  void db;
   // TODO: for each line, explode BOM and insert inventory_transaction rows
   for (const line of params.lines) {
     const depleted = explode(line.bom, line.qtySold);
-    // eslint-disable-next-line no-console
     console.log(`Depletion for menu item ${line.menuItemId}:`, depleted);
   }
 }

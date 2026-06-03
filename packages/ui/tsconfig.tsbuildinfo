@@ -1,0 +1,1 @@
+{"root":["./src/index.ts","./src/components/button.tsx","./src/components/card.tsx","./src/components/input.tsx","./src/components/label.tsx","./src/components/separator.tsx","./src/lib/utils.ts"],"version":"5.9.3"}

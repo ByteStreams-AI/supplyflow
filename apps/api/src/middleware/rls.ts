@@ -1,5 +1,10 @@
 import { createMiddleware } from 'hono/factory';
 import type { AppEnv } from '../index';
+declare module 'hono' {
+  interface ContextVariableMap {
+    rlsToken: string;
+  }
+}
 
 /**
  * Sets the Supabase JWT as a Postgres session variable so that RLS policies
@@ -11,6 +16,6 @@ import type { AppEnv } from '../index';
 export const rlsMiddleware = createMiddleware<AppEnv>(async (c, next) => {
   const authHeader = c.req.header('Authorization');
   const token = authHeader?.slice(7) ?? '';
-  c.set('rlsToken' as never, token);
+  c.set('rlsToken', token);
   await next();
 });

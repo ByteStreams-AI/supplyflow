@@ -2,7 +2,7 @@
 
 > Real-Time Supply for Real-World Kitchens
 
-SupplyFlow is a multi-tenant SaaS restaurant supply-chain platform. It gives independent restaurants and small chains real-time control over procurement, inventory, warehousing, logistics, and food cost — driven by actual sales rather than guesswork.
+SupplyFlow is a multi-tenant SaaS restaurant supply-chain platform. It gives independent multi-location operators and small regional chains (**3–30 locations**) real-time control over procurement, inventory, warehousing, logistics, and food cost — driven by actual sales rather than guesswork.
 
 ---
 
@@ -10,9 +10,13 @@ SupplyFlow is a multi-tenant SaaS restaurant supply-chain platform. It gives ind
 
 Every menu item is backed by a **Bill of Materials (BOM)**, so when a sale happens, stock is depleted to the ingredient level automatically and true plate cost is always known. SupplyFlow is AI-forward: predictive sourcing, demand forecasting, price-trend modeling, and shortage detection ship at launch.
 
+**Execution wedge:** **sale → depletion → reorder** with strong BOM accuracy and explainable recommendations.
+
+**Integration strategy:** implement connectors in this order: **DialTone**, then **Toast**, then **Square**; keep ingestion channel-agnostic so downstream depletion/reorder logic stays connector-independent.
+
 **Core capabilities:**
 - Procurement across multiple vendors with sole-source risk flagging and JIT ordering
-- Live inventory driven by BOM-linked sales depletion (via DialTone integration)
+- Live inventory driven by BOM-linked sales depletion (channel-agnostic POS ingestion)
 - Warehousing: mobile receiving, picking, bin/zone management, expiry tracking
 - Inter-location transfers for multi-site groups and commissary operations
 - Always-current plate cost and food-cost % based on live ingredient pricing
@@ -109,7 +113,8 @@ SUPABASE_SERVICE_ROLE_KEY=
 STRIPE_SECRET_KEY=           # Stripe test mode key
 ANTHROPIC_API_KEY=
 RESEND_API_KEY=
-DIALTONE_WEBHOOK_SECRET=
+PRIMARY_CHANNEL_WEBHOOK_SECRET=   # first POS connector webhook secret
+DIALTONE_WEBHOOK_SECRET=          # optional when DialTone adapter is enabled
 ```
 
 ---
@@ -118,7 +123,9 @@ DIALTONE_WEBHOOK_SECRET=
 
 | Document | Description |
 |---|---|
-| [`docs/PRD-SupplyFlow-2026-05-21.md`](docs/PRD-SupplyFlow-2026-05-21.md) | Full Product Requirements Document |
+| [`docs/market-validation.md`](docs/market-validation.md) | Market validation, segment focus, and strategic wedge |
+| [`docs/PRD-SupplyFlow.md`](docs/PRD-SupplyFlow.md) | Full Product Requirements Document |
+| [`docs/project-status.md`](docs/project-status.md) | Active 2-week execution window and current priorities |
 | [`docs/tech-stack-and-approach.md`](docs/tech-stack-and-approach.md) | Tech stack, architecture decisions, and implementation patterns |
 | [`developer/developer-journal.md`](developer/developer-journal.md) | Running developer journal |
 
@@ -131,7 +138,7 @@ DIALTONE_WEBHOOK_SECRET=
 | **0 — Foundation** | Multi-tenancy, auth, RLS, Stripe billing skeleton | Tenant self-onboards; isolation verified |
 | **1 — Catalog & Inventory Core** | Items, BOM editor, inventory ledger, par levels | BOMs exist; live stock balances correct |
 | **2 — Procurement & Warehousing** | Vendors, POs, mobile receiving, picking | Full procure-to-receive cycle |
-| **3 — DialTone Integration & Costs** | Order ingestion, depletion, plate cost, ABC | Sales auto-deplete stock; food cost is live |
+| **3 — POS Integration & Costs** | First deep POS connector ingestion, depletion, plate cost, ABC | Sales auto-deplete stock; food cost is live |
 | **4 — Logistics & Predictive AI** | Transfers, delivery calendar, forecasting, Claude insights | AI-forward v1; full O1–O6 coverage |
 | **5 — Hardening & Launch** | Offline sync, perf, security review, pilot | Launch-ready |
 
@@ -139,4 +146,4 @@ DIALTONE_WEBHOOK_SECRET=
 
 ## Related Projects
 
-- **DialTone** (`dialtone.menu`) — ByteStreams voice-AI phone ordering agent; v1 sales channel for SupplyFlow
+- **DialTone** (`dialtone.menu`) — ByteStreams voice-AI phone ordering agent; compatible adapter channel for SupplyFlow ingestion

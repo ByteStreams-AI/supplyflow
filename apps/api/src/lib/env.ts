@@ -2,6 +2,8 @@ export type Env = {
   // Secrets (set via wrangler secret / CF dashboard)
   SUPABASE_URL: string;
   SUPABASE_SERVICE_ROLE_KEY: string;
+  /** Transaction-mode pooler URL for Drizzle (port 6543). */
+  SUPABASE_DB_URL: string;
   SUPABASE_JWT_SECRET: string;
   STRIPE_SECRET_KEY: string;
   STRIPE_WEBHOOK_SECRET: string;

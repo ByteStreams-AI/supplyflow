@@ -5,19 +5,20 @@
 | **Document** | Tech Stack & Technical Approach |
 | **Version** | 0.1 — Draft |
 | **Date** | 2026-05-26 |
-| **Source PRD** | `docs/PRD-SupplyFlow-2026-05-21.md` |
+| **Source PRD** | `docs/PRD-SupplyFlow.md` |
 | **Status** | For review |
 
 ---
 
 ## 1. Guiding Principles
 
-1. **Consistency with the ByteStreams/DialTone stack** — share infrastructure, billing, auth, and operational patterns wherever it reduces cognitive overhead.
-2. **Edge-first API** — Cloudflare Workers for low-latency global deploys; no server management.
-3. **Strong multi-tenant isolation** — Postgres RLS as the enforcement layer, not the application layer.
-4. **Monorepo** — share TypeScript domain types, DB schemas, and the BOM engine across web, mobile, and API without duplication.
-5. **Offline-capable mobile** — counts and receiving must survive walk-in connectivity loss.
-6. **AI as a first-class layer** — ML and LLM are design inputs, not afterthoughts; the Python service and Claude integration are part of the baseline architecture.
+1. **Consistency with the ByteStreams ecosystem** — share infrastructure, billing, auth, and operational patterns wherever it reduces cognitive overhead.
+2. **Wedge-first execution** — prioritize the sale → depletion → reorder loop for the 3–30 location segment; depth on one POS connector first, breadth later.
+3. **Edge-first API** — Cloudflare Workers for low-latency global deploys; no server management.
+4. **Strong multi-tenant isolation** — Postgres RLS as the enforcement layer, not the application layer.
+5. **Monorepo** — share TypeScript domain types, DB schemas, and the BOM engine across web, mobile, and API without duplication.
+6. **Offline-capable mobile** — counts and receiving must survive walk-in connectivity loss.
+7. **AI as a first-class layer** — ML and LLM are design inputs, not afterthoughts; the Python service and Claude integration are part of the baseline architecture.
 
 ---
 
@@ -83,7 +84,7 @@ supplyflow/                          # pnpm workspaces + Turborepo
 | Auth middleware | Supabase JWT verification | JWT carries `tenant_id`, `role`, `location_ids`; injected into request context |
 | Rate limiting | **Cloudflare KV** (sliding window) | Mirror DialTone's pattern |
 | Background queues | **Cloudflare Queues** | PO email dispatch, BOM depletion fan-out, forecast triggers |
-| Scheduled jobs | **Cloudflare Cron Triggers** | ABC classification, reorder-point sweeps, DialTone pull fallback |
+| Scheduled jobs | **Cloudflare Cron Triggers** | ABC classification, reorder-point sweeps, channel pull fallback (contingency) |
 | PDF generation | **@react-pdf/renderer** (server-side) | PO PDFs rendered in Worker and sent via Resend |
 
 **API structure:**
@@ -102,7 +103,7 @@ apps/api/src/
 │   ├── inventory/         # Transactions, stock levels, counts
 │   ├── warehousing/       # Storage areas, receiving, picking
 │   ├── transfers/         # Inter-location transfers
-│   ├── sales/             # DialTone ingestion, channel map
+│   ├── sales/             # POS/channel ingestion, channel map
 │   ├── costing/           # Plate cost, cost snapshots
 │   ├── ai/                # Insight alerts, forecast reads, LLM proxy
 │   └── billing/           # Stripe webhook, plan entitlements
@@ -137,8 +138,8 @@ apps/api/src/
 
 | Concern | Technology | Notes |
 |---|---|---|
-| Framework | **React Native + Expo SDK 52** | Shared TypeScript domain types with web/API |
-| Navigation | **Expo Router v4** (file-based) | |
+| Framework | **React Native + Expo SDK 53** | Shared TypeScript domain types with web/API |
+| Navigation | **Expo Router v5** (file-based) | |
 | UI components | **Tamagui** | Cross-platform design tokens; fast on Hermes |
 | Forms | React Hook Form + Zod | Same schemas as web |
 | Barcode scanning | **expo-camera** + **expo-barcode-scanner** | Receiving and picking flows |
@@ -227,7 +228,7 @@ POST /llm/extract-invoice  # Document extraction (Claude vision)
 | ABC classification | Daily | Cloudflare Cron → `apps/jobs` Worker |
 | Reorder-point sweep | Every 4 hours | Cloudflare Cron → `apps/jobs` Worker |
 | Forecast retraining | Weekly per tenant | Cron → Cloudflare Queue → ML service |
-| DialTone pull fallback | Every 15 min (Phase 3 contingency) | Cloudflare Cron → `apps/jobs` Worker |
+| Channel pull fallback | Every 15 min (Phase 3 contingency) | Cloudflare Cron → `apps/jobs` Worker |
 | Price-trend model run | Daily | Cron → ML service |
 | Cost snapshot | Daily | Cloudflare Cron → `apps/jobs` Worker |
 
@@ -355,29 +356,35 @@ WAC is recalculated in the same transaction as the receipt ledger entry. This ke
 | `count_correction` | `stock_count` | stock_count.id |
 | `production` | `production_run` | production_run.id |
 
-### 4.4 DialTone Integration & Sales-Driven Depletion
+### 4.4 POS Integration & Sales-Driven Depletion
 
-**Ingestion endpoint:** `POST /api/channels/dialtone/orders`
+**Ingestion endpoint:** `POST /api/channels/:source_system/orders`
 
-Security: HMAC-SHA256 signature on the request body, verified with a shared secret stored in Cloudflare Worker secrets (never in git or env files).
+The canonical write path is channel-agnostic. In v1, connector implementation order is
+`dialtone` first, then `toast`, then `square`.
+
+Security: HMAC-SHA256 signature on the request body, verified with a per-channel secret stored
+in Cloudflare Worker secrets (never in git or env files).
 
 ```
 Webhook arrives
   → Verify HMAC signature (reject 401 if invalid)
-  → Upsert sales_order keyed on (source_system='dialtone', source_order_id)
+  → Upsert sales_order keyed on (source_system, source_order_id)
      → If already exists: 200 OK, no-op (idempotency)
      → If new: insert sales_order + sales_order_line rows
   → For each order line:
-     → Resolve channel_item_map(tenant, 'dialtone', external_item_id) → menu_item_id
+     → Resolve channel_item_map(tenant, source_system, external_item_id) → menu_item_id
      → If no mapping: insert into unmapped_item_queue; raise insight_alert
      → If mapped: BOM-explode(menu_item, qty) → raw item depletions
   → Batch INSERT inventory_transaction rows (sale_depletion)
   → UPDATE stock_level projection (batch)
+  → Evaluate low-stock thresholds and prepare reorder suggestions
   → Mark sales_order.status = 'depleted'
   → Return 200 OK
 ```
 
-The ingestion handler is **channel-agnostic**: it accepts a `source_system` discriminator, so Toast/Square/Clover connectors plug into the same pipeline later with no core changes.
+This keeps the sale → depletion → reorder loop stable while allowing additional connectors
+after the first deep POS integration is production-ready.
 
 ### 4.5 Real-Time Stock Updates
 
@@ -455,7 +462,7 @@ The Cloudflare Queue consumer picks up the invalidation event and re-runs plate 
 
 ### 5.1 Secrets Management
 
-All secrets stored as **Cloudflare Worker Secrets** (API) and **Fly.io / Container secrets** (ML service). Never in `.env` files committed to git. Mirror DialTone's practice exactly.
+All secrets stored as **Cloudflare Worker Secrets** (API) and **Fly.io / Container secrets** (ML service). Never in `.env` files committed to git. Mirror established ByteStreams secret-handling practice.
 
 Required secrets per service:
 
@@ -466,7 +473,8 @@ Required secrets per service:
 - `STRIPE_WEBHOOK_SECRET`
 - `RESEND_API_KEY`
 - `ANTHROPIC_API_KEY`
-- `DIALTONE_WEBHOOK_SECRET` (HMAC shared secret)
+- `PRIMARY_CHANNEL_WEBHOOK_SECRET` (HMAC shared secret for selected POS connector)
+- `DIALTONE_WEBHOOK_SECRET` (optional, when DialTone adapter is enabled)
 - `INTERNAL_ML_API_KEY`
 
 **ML Service:**
@@ -477,7 +485,7 @@ Required secrets per service:
 
 ### 5.2 Webhook Security
 
-DialTone webhook verification:
+Channel webhook verification:
 
 ```ts
 async function verifyHmac(request: Request, secret: string): Promise<boolean> {
@@ -492,7 +500,9 @@ async function verifyHmac(request: Request, secret: string): Promise<boolean> {
 }
 ```
 
-Stripe webhooks use Stripe's own `constructEvent` signature verification.
+The same verifier pattern is used for the first selected POS connector and any enabled
+adapter channels (including DialTone). Stripe webhooks use Stripe's own `constructEvent`
+signature verification.
 
 ### 5.3 Additional Controls
 
@@ -567,7 +577,8 @@ cd apps/ml && uv sync && uv run uvicorn main:app --reload
 - `STRIPE_SECRET_KEY` → Stripe test mode key
 - `ANTHROPIC_API_KEY`
 - `RESEND_API_KEY` → Resend test mode
-- `DIALTONE_WEBHOOK_SECRET` → local test secret
+- `PRIMARY_CHANNEL_WEBHOOK_SECRET` → local test secret for selected POS connector
+- `DIALTONE_WEBHOOK_SECRET` → local test secret when DialTone adapter is enabled
 
 ---
 

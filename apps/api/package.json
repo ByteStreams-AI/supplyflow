@@ -8,6 +8,7 @@
     "build": "tsc --noEmit && wrangler deploy --dry-run",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
+    "test": "vitest run",
     "deploy": "wrangler deploy",
     "cf-typegen": "wrangler types"
   },
@@ -16,12 +17,16 @@
     "@supplyflow/types": "workspace:*",
     "@supplyflow/db": "workspace:*",
     "@supplyflow/bom": "workspace:*",
+    "drizzle-orm": "^0.43.1",
+    "@supabase/supabase-js": "^2.50.0",
+    "stripe": "^18.2.1",
     "zod": "^3.25.28",
     "@react-pdf/renderer": "^4.3.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250525.0",
     "wrangler": "^4.18.0",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
   }
 }
