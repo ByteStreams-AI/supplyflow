@@ -4,6 +4,47 @@ Chronological record of implementation decisions, changes made, and why. Most re
 
 ---
 
+## June 3, 2026 — Segment wording aligned to single + multi-location support
+
+Updated planning/instruction docs to match the revised PRD segment statement that SupplyFlow supports both single-location and multi-location operators.
+
+**What changed:**
+
+- Updated `AGENTS.md` Primary ICP wording to: independent **single and multi-location** operators and regional chains.
+- Updated `docs/project-status.md` snapshot to explicitly state support for both single-location and multi-location operators.
+
+**Why this was done:**
+
+- `docs/PRD-SupplyFlow.md` was updated to clarify single + multi-location support; related execution docs needed the same positioning language to avoid segmentation drift.
+
+## June 3, 2026 — Rebuilt project-status to fully cover PRD features
+
+Reworked `docs/project-status.md` so every PRD feature area is explicitly represented with current implementation status, and milestone sequencing now spans the full PRD scope.
+
+**What changed:**
+
+- Replaced the previous 2-milestone view with a PRD-aligned status structure.
+- Added a **PRD Coverage Matrix** that includes:
+  - Module A through Module I statuses
+  - platform/security/infra status coverage
+  - explicit `Done` / `In Progress` / `Not Started` states based on repository reality.
+- Added expanded **Milestone 1–7** plan to cover:
+  - completed foundation/catalog slice
+  - remaining tenancy/access, full BOM workflows, operational core (procurement/inventory/warehousing/logistics), ingestion loop, costing+AI, and launch hardening.
+- Updated health signals in status doc to reflect current verified command outcomes (`typecheck`, `lint`, `test` all passing).
+- Updated PRD-aligned exit criteria to require implemented module slices, removal of `501`s in implemented scope, connector sequence execution in code, end-to-end depletion, mobile offline thin slice, and CI enforcement.
+
+**Validation performed:**
+
+- `pnpm typecheck` ✅
+- `pnpm lint` ✅
+- `pnpm test` ✅
+
+**Why this was done:**
+
+- The prior status doc did not enumerate all PRD features and mixed completed slice language with broader PRD scope.
+- This update makes planning and reporting auditable directly against PRD requirements.
+
 ## June 3, 2026 — Addressed Milestone 1 code-review risks (6 items)
 
 Implemented follow-up fixes for the six risks identified in the Milestone 1 review.

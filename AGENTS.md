@@ -5,7 +5,7 @@ Multi-tenant restaurant supply-chain SaaS. Read this file before making any chan
 ---
 ## Current Product Scope (June 2026)
 
-- **Primary ICP:** independent multi-location operators and regional chains (**3–30 locations**).
+- **Primary ICP:** independent single and multi-location operators and regional chains (**3–30 locations**).
 - **Execution wedge:** **sale → depletion → reorder** loop with strong BOM accuracy.
 - **Integration strategy:** execute connector implementation in this order: **DialTone first, then Toast, then Square**; keep ingestion channel-agnostic to avoid connector-specific coupling in core depletion/reorder paths.
 - **Operational differentiator:** offline-first mobile counting/receiving is a headline requirement, not a later polish item.

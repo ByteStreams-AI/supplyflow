@@ -19,11 +19,11 @@
 ### 1.1 Summary
 
 SupplyFlow is a **multi-tenant SaaS** restaurant supply-chain platform. It gives independent
-multi-location operators and small regional chains (primarily **3–30 locations**) real-time
-control over procurement, inventory, warehousing, logistics, and food cost — driven by actual
-sales rather than guesswork. Every menu item is backed by a **Bill of Materials (BOM)**, so
-when a sale happens, stock is depleted to the ingredient level automatically and true plate cost
-is always known.
+single and multi-location operators and small regional chains (primarily **3–30 locations**)
+real-time control over procurement, inventory, warehousing, logistics, and food cost — driven
+by actual sales rather than guesswork. Every menu item is backed by a **Bill of Materials (BOM)**,
+so when a sale happens, stock is depleted to the ingredient level automatically and true plate
+cost is always known.
 
 SupplyFlow is **AI-forward**: predictive sourcing, demand forecasting, price-trend modeling,
 and shortage detection are headline capabilities from launch, not a later add-on.
